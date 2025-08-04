@@ -17,7 +17,7 @@ class LLMService:
         openai.api_key = self.api_key
         
         # Token counter
-        self.encoding = tiktoken.encoding_for_model(self.model)
+        self.encoding = tiktoken.get_encoding("cl100k_base")
     
     def count_tokens(self, text: str) -> int:
         """Count tokens in text"""
@@ -164,3 +164,4 @@ Provide only the JSON response without any additional text."""
 
 # Singleton instance
 llm_service = LLMService()
+

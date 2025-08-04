@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from loguru import logger
@@ -48,11 +48,12 @@ app.include_router(
 )
 
 @app.get("/")
-async def root():
+async def root(request: Request):
+    base_url = str(request.base_url)
     return {
         "message": "LLM Query Retrieval System API",
         "version": "1.0.0",
-        "docs": f"http://localhost:{settings.API_PORT}/docs"
+        "docs": f"{base_url}docs"
     }
 
 @app.get("/health")

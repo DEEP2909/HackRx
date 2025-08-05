@@ -15,15 +15,20 @@ from app.core.config import settings
 from app.models.document import DocumentChunk
 
 class DocumentProcessor:
-    """Service for processing various document formats"""
+    """Optimized document processor with better chunking strategy"""
     
     def __init__(self):
-        self.chunk_size = settings.CHUNK_SIZE
-        self.chunk_overlap = settings.CHUNK_OVERLAP
+        # Optimized chunking for better token efficiency
+        self.chunk_size = 800        # Reduced from 1000
+        self.chunk_overlap = 100     # Reduced from 200
         self.max_file_size = settings.max_file_size_bytes
         
+        # Smart chunking parameters
+        self.sentence_endings = r'[.!?]\s+'
+        self.paragraph_separators = r'\n\s*\n'
+        
     async def download_document(self, url: str) -> bytes:
-        """Download document from URL"""
+        """Download document from URL with caching"""
         logger.info(f"Downloading document from: {url}")
         
         async with httpx.AsyncClient(timeout=settings.REQUEST_TIMEOUT) as client:
@@ -38,110 +43,164 @@ class DocumentProcessor:
             return response.content
     
     def extract_text_from_pdf(self, content: bytes) -> str:
-        """Extract text from PDF content"""
+        """Extract text from PDF with better formatting preservation"""
         text = ""
         
-        # Try PyPDF2 first
         try:
-            pdf_file = io.BytesIO(content)
-            pdf_reader = PyPDF2.PdfReader(pdf_file)
-            
-            for page_num in range(len(pdf_reader.pages)):
-                page = pdf_reader.pages[page_num]
-                text += page.extract_text() + "\n"
-                
+            # Use pdfplumber for better text extraction
+            with pdfplumber.open(io.BytesIO(content)) as pdf:
+                for page in pdf.pages:
+                    page_text = page.extract_text()
+                    if page_text:
+                        # Clean and format text
+                        page_text = self._clean_page_text(page_text)
+                        text += page_text + "\n\n"
         except Exception as e:
-            logger.warning(f"PyPDF2 extraction failed, trying pdfplumber: {e}")
+            logger.warning(f"pdfplumber failed, trying PyPDF2: {e}")
             
-            # Fallback to pdfplumber
+            # Fallback to PyPDF2
             try:
-                with pdfplumber.open(io.BytesIO(content)) as pdf:
-                    for page in pdf.pages:
-                        page_text = page.extract_text()
-                        if page_text:
-                            text += page_text + "\n"
+                pdf_file = io.BytesIO(content)
+                pdf_reader = PyPDF2.PdfReader(pdf_file)
+                
+                for page_num in range(len(pdf_reader.pages)):
+                    page = pdf_reader.pages[page_num]
+                    page_text = page.extract_text()
+                    if page_text:
+                        page_text = self._clean_page_text(page_text)
+                        text += page_text + "\n\n"
             except Exception as e2:
                 logger.error(f"PDF extraction failed: {e2}")
                 raise
         
         return text.strip()
     
+    def _clean_page_text(self, text: str) -> str:
+        """Clean extracted text while preserving structure"""
+        # Fix common PDF extraction issues
+        text = re.sub(r'\s+', ' ', text)  # Multiple spaces to single
+        text = re.sub(r'([a-z])([A-Z])', r'\1. \2', text)  # Add periods between sentences
+        text = re.sub(r'(\w)-\s*\n\s*(\w)', r'\1\2', text)  # Fix hyphenated words
+        text = re.sub(r'\n+', ' ', text)  # Remove extra newlines
+        
+        return text.strip()
+    
     def extract_text_from_docx(self, content: bytes) -> str:
         """Extract text from DOCX content"""
         doc = Document(io.BytesIO(content))
-        text = ""
+        text_parts = []
         
         for paragraph in doc.paragraphs:
-            text += paragraph.text + "\n"
+            if paragraph.text.strip():
+                text_parts.append(paragraph.text.strip())
         
-        # Also extract from tables
+        # Extract from tables
         for table in doc.tables:
             for row in table.rows:
+                row_text = []
                 for cell in row.cells:
-                    text += cell.text + " "
-                text += "\n"
+                    if cell.text.strip():
+                        row_text.append(cell.text.strip())
+                if row_text:
+                    text_parts.append(' | '.join(row_text))
         
-        return text.strip()
+        return '\n\n'.join(text_parts)
     
     def extract_text_from_html(self, content: bytes) -> str:
         """Extract text from HTML/Email content"""
         soup = BeautifulSoup(content, 'html.parser')
         
-        # Remove script and style elements
-        for script in soup(["script", "style"]):
-            script.decompose()
+        # Remove unwanted elements
+        for element in soup(["script", "style", "nav", "header", "footer"]):
+            element.decompose()
         
-        # Get text
-        text = soup.get_text()
+        # Get text with better formatting
+        text = soup.get_text(separator=' ', strip=True)
         
-        # Clean up text
-        lines = (line.strip() for line in text.splitlines())
-        chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
-        text = ' '.join(chunk for chunk in chunks if chunk)
+        # Clean up
+        text = re.sub(r'\s+', ' ', text)
         
         return text
     
-    def clean_text(self, text: str) -> str:
-        """Clean and normalize text"""
-        # Remove multiple spaces and newlines
-        text = re.sub(r'\s+', ' ', text)
-        
-        # Remove special characters but keep punctuation
-        text = re.sub(r'[^\w\s\.\,\;\:\!\?\-\(\)\[\]\{\}\"\'\/]', '', text)
-        
-        # Normalize whitespace
-        text = ' '.join(text.split())
-        
-        return text.strip()
-    
-    def create_chunks(self, text: str, metadata: Dict[str, Any] = None) -> List[DocumentChunk]:
-        """Split text into overlapping chunks"""
+    def smart_chunk_text(self, text: str, metadata: Dict[str, Any] = None) -> List[DocumentChunk]:
+        """Smart chunking that respects sentence and paragraph boundaries"""
         if metadata is None:
             metadata = {}
-            
-        words = text.split()
+        
         chunks = []
         
-        for i in range(0, len(words), self.chunk_size - self.chunk_overlap):
-            chunk_words = words[i:i + self.chunk_size]
-            chunk_text = ' '.join(chunk_words)
-            
-            if chunk_text:
-                chunk = DocumentChunk(
-                    content=chunk_text,
-                    metadata={
-                        **metadata,
-                        'chunk_index': len(chunks),
-                        'start_word': i,
-                        'end_word': min(i + self.chunk_size, len(words))
-                    }
-                )
-                chunks.append(chunk)
+        # First, try to split by paragraphs
+        paragraphs = re.split(self.paragraph_separators, text)
         
+        current_chunk = ""
+        current_word_count = 0
+        
+        for paragraph in paragraphs:
+            paragraph = paragraph.strip()
+            if not paragraph:
+                continue
+            
+            paragraph_words = len(paragraph.split())
+            
+            # If paragraph alone is too big, split by sentences
+            if paragraph_words > self.chunk_size:
+                # Save current chunk if it has content
+                if current_chunk:
+                    chunks.append(self._create_chunk(current_chunk, metadata, len(chunks)))
+                    current_chunk = ""
+                    current_word_count = 0
+                
+                # Split large paragraph by sentences
+                sentences = re.split(self.sentence_endings, paragraph)
+                for sentence in sentences:
+                    sentence = sentence.strip()
+                    if not sentence:
+                        continue
+                    
+                    sentence_words = len(sentence.split())
+                    
+                    if current_word_count + sentence_words > self.chunk_size:
+                        if current_chunk:
+                            chunks.append(self._create_chunk(current_chunk, metadata, len(chunks)))
+                        current_chunk = sentence
+                        current_word_count = sentence_words
+                    else:
+                        current_chunk += (" " if current_chunk else "") + sentence
+                        current_word_count += sentence_words
+            
+            # Normal paragraph processing
+            elif current_word_count + paragraph_words > self.chunk_size:
+                # Save current chunk and start new one
+                if current_chunk:
+                    chunks.append(self._create_chunk(current_chunk, metadata, len(chunks)))
+                current_chunk = paragraph
+                current_word_count = paragraph_words
+            else:
+                # Add to current chunk
+                current_chunk += ("\n\n" if current_chunk else "") + paragraph
+                current_word_count += paragraph_words
+        
+        # Add final chunk
+        if current_chunk:
+            chunks.append(self._create_chunk(current_chunk, metadata, len(chunks)))
+        
+        logger.info(f"Smart chunking created {len(chunks)} chunks")
         return chunks
     
+    def _create_chunk(self, content: str, metadata: Dict[str, Any], index: int) -> DocumentChunk:
+        """Create a document chunk with metadata"""
+        return DocumentChunk(
+            content=content.strip(),
+            metadata={
+                **metadata,
+                'chunk_index': index,
+                'word_count': len(content.split()),
+                'char_count': len(content)
+            }
+        )
+    
     async def process_document(self, url: str) -> List[DocumentChunk]:
-        """Main method to process document from URL"""
+        """Main method to process document from URL with optimizations"""
         logger.info(f"Processing document: {url}")
         
         # Download document
@@ -166,19 +225,22 @@ class DocumentProcessor:
             text = content.decode('utf-8', errors='ignore')
             doc_type = 'text'
         
-        # Clean text
-        text = self.clean_text(text)
+        if not text or len(text.strip()) < 50:
+            raise ValueError("Document appears to be empty or too short")
         
         # Create chunks with metadata
         metadata = {
             'source_url': url,
             'document_type': doc_type,
-            'filename': filename
+            'filename': filename,
+            'total_chars': len(text),
+            'total_words': len(text.split())
         }
         
-        chunks = self.create_chunks(text, metadata)
+        # Use smart chunking
+        chunks = self.smart_chunk_text(text, metadata)
         
-        logger.info(f"Created {len(chunks)} chunks from document")
+        logger.info(f"Created {len(chunks)} optimized chunks from document")
         return chunks
 
 # Singleton instance

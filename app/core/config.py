@@ -17,12 +17,12 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     API_TOKEN: str
 
-    # OpenAI Configuration
+    # OpenAI Configuration - OPTIMIZED FOR COST
     OPENAI_API_KEY: str
-    OPENAI_MODEL: str = "gpt-4"
+    OPENAI_MODEL: str = "gpt-3.5-turbo"  # Changed from gpt-4 to save costs
     OPENAI_EMBEDDING_MODEL: str = "text-embedding-ada-002"
-    MAX_TOKENS: int = 4000
-    TEMPERATURE: float = 0.3
+    MAX_TOKENS: int = 1500              # Reduced from 4000
+    TEMPERATURE: float = 0.1            # Lower for more focused responses
 
     # Pinecone Configuration
     PINECONE_API_KEY: Optional[str] = None
@@ -33,21 +33,30 @@ class Settings(BaseSettings):
     DATABASE_URL: str
     DB_ECHO: bool = False
 
-    # Document Processing
-    MAX_FILE_SIZE_MB: int = 50
+    # Document Processing - OPTIMIZED
+    MAX_FILE_SIZE_MB: int = 25          # Reduced from 50
     ALLOWED_EXTENSIONS: str = "pdf,docx,txt,eml"
-    CHUNK_SIZE: int = 1000
-    CHUNK_OVERLAP: int = 200
+    CHUNK_SIZE: int = 800              # Reduced from 1000
+    CHUNK_OVERLAP: int = 100           # Reduced from 200
 
-    # Vector Store
-    VECTOR_STORE_TYPE: str = "faiss"  # Options: pinecone, faiss
+    # Vector Store - OPTIMIZED
+    VECTOR_STORE_TYPE: str = "faiss"
     EMBEDDING_DIMENSION: int = 1536
-    TOP_K_RESULTS: int = 10
+    TOP_K_RESULTS: int = 5             # Reduced from 10 to limit context
 
     # Performance Settings
     REQUEST_TIMEOUT: int = 60
-    MAX_CONCURRENT_REQUESTS: int = 10
+    MAX_CONCURRENT_REQUESTS: int = 5    # Reduced from 10
     CACHE_TTL_SECONDS: int = 3600
+
+    # Token Management - NEW
+    MAX_CONTEXT_TOKENS: int = 3000     # Limit context size
+    MAX_PROMPT_TOKENS: int = 4000      # Total prompt limit
+    TOKEN_BUFFER: int = 500            # Safety buffer
+    
+    # Batch Processing - NEW
+    EMBEDDING_BATCH_SIZE: int = 10     # Reduced from 20
+    PARALLEL_QUESTIONS: int = 3        # Limit parallel processing
 
     @property
     def allowed_extensions_list(self) -> List[str]:

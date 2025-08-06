@@ -145,7 +145,7 @@ Context:
 Question: {question}
 
 Provide a JSON response with these fields:
-- "answer": 40-60 word answer
+- "answer": min 10 words and max 65 words answer
 - "confidence": score 0-1
 - "found_in_context": true/false
 
@@ -209,3 +209,4 @@ If no relevant info found, set answer to "Information not Available"."""
 
 # Singleton instance
 llm_service = LLMService()
+

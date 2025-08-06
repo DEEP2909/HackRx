@@ -17,12 +17,12 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     API_TOKEN: str
 
-    # OpenAI Configuration - OPTIMIZED FOR COST
+    # OpenAI Configuration - ULTRA OPTIMIZED FOR SPEED
     OPENAI_API_KEY: str
-    OPENAI_MODEL: str = "gpt-3.5-turbo"  # Changed from gpt-4 to save costs
+    OPENAI_MODEL: str = "gpt-3.5-turbo"
     OPENAI_EMBEDDING_MODEL: str = "text-embedding-ada-002"
-    MAX_TOKENS: int = 1500              # Reduced from 4000
-    TEMPERATURE: float = 0.1            # Lower for more focused responses
+    MAX_TOKENS: int = 500                   # REDUCED FROM 1500
+    TEMPERATURE: float = 0.0                # DETERMINISTIC
 
     # Pinecone Configuration
     PINECONE_API_KEY: Optional[str] = None
@@ -33,30 +33,30 @@ class Settings(BaseSettings):
     DATABASE_URL: str
     DB_ECHO: bool = False
 
-    # Document Processing - OPTIMIZED
-    MAX_FILE_SIZE_MB: int = 25          # Reduced from 50
+    # Document Processing - ULTRA OPTIMIZED
+    MAX_FILE_SIZE_MB: int = 10              # REDUCED FROM 25
     ALLOWED_EXTENSIONS: str = "pdf,docx,txt,eml"
-    CHUNK_SIZE: int = 800              # Reduced from 1000
-    CHUNK_OVERLAP: int = 100           # Reduced from 200
+    CHUNK_SIZE: int = 400                   # REDUCED FROM 800
+    CHUNK_OVERLAP: int = 50                 # REDUCED FROM 100
 
-    # Vector Store - OPTIMIZED
+    # Vector Store - ULTRA OPTIMIZED
     VECTOR_STORE_TYPE: str = "faiss"
     EMBEDDING_DIMENSION: int = 1536
-    TOP_K_RESULTS: int = 5             # Reduced from 10 to limit context
+    TOP_K_RESULTS: int = 2                  # REDUCED FROM 5
 
-    # Performance Settings
-    REQUEST_TIMEOUT: int = 60
-    MAX_CONCURRENT_REQUESTS: int = 5    # Reduced from 10
+    # Performance Settings - AGGRESSIVE
+    REQUEST_TIMEOUT: int = 25               # REDUCED FROM 60
+    MAX_CONCURRENT_REQUESTS: int = 2        # REDUCED FROM 5
     CACHE_TTL_SECONDS: int = 3600
 
-    # Token Management - NEW
-    MAX_CONTEXT_TOKENS: int = 3000     # Limit context size
-    MAX_PROMPT_TOKENS: int = 4000      # Total prompt limit
-    TOKEN_BUFFER: int = 500            # Safety buffer
+    # Token Management - ULTRA STRICT
+    MAX_CONTEXT_TOKENS: int = 800           # REDUCED FROM 3000
+    MAX_PROMPT_TOKENS: int = 1500           # REDUCED FROM 4000
+    TOKEN_BUFFER: int = 200                 # REDUCED FROM 500
     
-    # Batch Processing - NEW
-    EMBEDDING_BATCH_SIZE: int = 10     # Reduced from 20
-    PARALLEL_QUESTIONS: int = 3        # Limit parallel processing
+    # Batch Processing - FAST
+    EMBEDDING_BATCH_SIZE: int = 50          # INCREASED FROM 10
+    PARALLEL_QUESTIONS: int = 1             # SEQUENTIAL ONLY
 
     @property
     def allowed_extensions_list(self) -> List[str]:

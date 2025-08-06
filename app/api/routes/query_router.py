@@ -34,15 +34,13 @@ async def run_query(request: QueryRequest, credentials: HTTPAuthorizationCredent
         # NOT: {"answers": ["answer1", "answer2", ...]}
         
         # Ensure we return a plain list
-        if isinstance(answers, dict) and 'answers' in answers:
-            # If answers is wrapped in a dict, extract the list
-            return answers['answers']
-        elif isinstance(answers, list):
-            # If answers is already a list, return as-is
-            return answers
+        if isinstance(answers, list):
+            return {"answers": answers}
+        elif isinstance(answers, dict) and 'answers' in answers:
+            return answers  # Already in correct format
         else:
             # Fallback - wrap single answer in list
-            return [str(answers)]
+            return {"answers": [str(answers)]}
 
     except Exception as e:
         logger.error(f"Error during query processing: {e}")
@@ -62,3 +60,4 @@ async def test_format():
         "There is a waiting period of thirty-six (36) months of continuous coverage from the first policy inception for pre-existing diseases to be covered."
     ]
     return sample_response
+

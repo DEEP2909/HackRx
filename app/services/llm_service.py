@@ -145,7 +145,7 @@ Context:
 Question: {question}
 
 Provide a JSON response with these fields:
-- "answer": 40 to 60 words answer
+- "answer": 40 to 60 words explained answer
 - "confidence": score 0-1
 - "found_in_context": true/false
 
@@ -163,7 +163,7 @@ If no relevant info found, set answer to "Information not Available"."""
         }
         
         data = {
-            "model": "gpt-3.5-turbo",  # Use GPT-3.5 instead of GPT-4 to save costs
+            "model": "gpt-3.5-turbo-instruct",  # Use GPT-3.5 instead of GPT-4 to save costs
             "messages": [
                 {"role": "user", "content": prompt}
             ],
@@ -209,5 +209,6 @@ If no relevant info found, set answer to "Information not Available"."""
 
 # Singleton instance
 llm_service = LLMService()
+
 
 

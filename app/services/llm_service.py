@@ -163,7 +163,7 @@ If no relevant info found, set answer to "Information not Available"."""
         }
         
         data = {
-            "model": "gpt-3.5-turbo",  # Use GPT-3.5 instead of GPT-4 to save costs
+            "model": "gpt-4",  # Use GPT-3.5 instead of GPT-4 to save costs
             "messages": [
                 {"role": "user", "content": prompt}
             ],
@@ -209,6 +209,7 @@ If no relevant info found, set answer to "Information not Available"."""
 
 # Singleton instance
 llm_service = LLMService()
+
 
 
 

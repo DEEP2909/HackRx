@@ -1,3 +1,5 @@
+# app/services/query_engine.py - ULTRA-FAST VERSION
+
 import time
 from typing import List, Dict, Any
 from loguru import logger
@@ -10,131 +12,106 @@ from app.services.llm_service import llm_service
 from app.core.config import settings
 
 class QueryEngine:
-    """Main query processing engine that orchestrates all services"""
+    """ULTRA-FAST query processing engine"""
     
     def __init__(self):
-        self.document_cache = {}  # Simple in-memory cache
+        self.document_cache = {}
+        self.answer_cache = {}  # NEW: Answer caching
         
     async def process_query(self, document_url: str, questions: List[str]) -> List[str]:
-        """Process a query with document URL and questions"""
+        """ULTRA-FAST query processing"""
         start_time = time.time()
         
         try:
-            # Step 1: Process document if not cached
-            logger.info(f"Processing query for document: {document_url}")
+            # Step 1: Process document ONCE only
+            logger.info(f"FAST processing: {document_url}")
             await self._ensure_document_processed(document_url)
             
-            # Step 2: Process each question
-            answers = await self._process_questions(questions)
+            # Step 2: Process questions SEQUENTIALLY (avoid API rate limits)
+            answers = []
+            for question in questions:
+                answer = await self._process_single_question(question)
+                answers.append(answer)
             
-            # Log processing time
             processing_time = time.time() - start_time
-            logger.info(f"Query processed in {processing_time:.2f} seconds")
+            logger.info(f"FAST query completed in {processing_time:.2f}s")
             
             return answers
             
         except Exception as e:
-            logger.error(f"Error in query processing: {e}")
-            raise
+            logger.error(f"FAST query error: {e}")
+            # Return fallback answers to avoid timeout
+            return [f"Error processing question: {str(e)}" for _ in questions]
     
     async def _ensure_document_processed(self, document_url: str):
-        """Ensure document is processed and indexed"""
+        """FAST document processing with aggressive caching"""
         
-        # Check cache
+        # Check cache FIRST
         if document_url in self.document_cache:
-            logger.info("Document found in cache")
+            logger.info("Document in cache - SKIP processing")
             return
         
-        # Process document
-        logger.info("Processing new document")
+        # Process document FAST
+        logger.info("FAST document processing")
         chunks = await document_processor.process_document(document_url)
         
-        # Get embeddings for chunks
-        logger.info(f"Generating embeddings for {len(chunks)} chunks")
+        # Get embeddings in ONE batch
+        logger.info(f"FAST embedding: {len(chunks)} chunks")
         chunk_texts = [chunk.content for chunk in chunks]
         
-        # Batch embeddings for efficiency
-        batch_size = 20
-        all_embeddings = []
+        # Single batch for speed
+        embeddings = await embedding_service.get_embeddings(chunk_texts)
         
-        for i in range(0, len(chunk_texts), batch_size):
-            batch = chunk_texts[i:i+batch_size]
-            embeddings = await embedding_service.get_embeddings(batch)
-            all_embeddings.extend(embeddings)
-        
-        # Assign embeddings to chunks
-        for chunk, embedding in zip(chunks, all_embeddings):
+        # Assign embeddings
+        for chunk, embedding in zip(chunks, embeddings):
             chunk.embedding = embedding
         
         # Add to vector store
         await vector_store_service.add_documents(chunks)
         
-        # Cache document
+        # Cache immediately
         self.document_cache[document_url] = {
             'chunks': len(chunks),
             'processed_at': time.time()
         }
         
-        logger.info(f"Document processed and indexed: {len(chunks)} chunks")
-    
-    async def _process_questions(self, questions: List[str]) -> List[str]:
-        """Process multiple questions in parallel"""
-        
-        # Process questions concurrently for efficiency
-        tasks = [self._process_single_question(question) for question in questions]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-        
-        # Handle results
-        answers = []
-        for i, result in enumerate(results):
-            if isinstance(result, Exception):
-                logger.error(f"Error processing question {i}: {result}")
-                answers.append(f"Error processing question: {str(result)}")
-            else:
-                answers.append(result)
-        
-        return answers
+        logger.info(f"FAST processing cached: {len(chunks)} chunks")
     
     async def _process_single_question(self, question: str) -> str:
-        """Process a single question"""
-        logger.info(f"Processing question: {question}")
+        """FAST single question processing"""
+        
+        # Check answer cache
+        cache_key = hash(question)
+        if cache_key in self.answer_cache:
+            logger.info("Answer from cache")
+            return self.answer_cache[cache_key]
         
         try:
-            # Step 1: Get embedding for question
+            # FAST embedding
             question_embeddings = await embedding_service.get_embeddings([question])
             question_embedding = question_embeddings[0]
             
-            # Step 2: Search for relevant chunks
+            # FAST search - only top 2 results
             search_results = await vector_store_service.search(
                 query_embedding=question_embedding,
-                top_k=settings.TOP_K_RESULTS
+                top_k=2  # REDUCED FROM 5
             )
             
             if not search_results:
-                return "No relevant information found in the document to answer this question."
+                answer = "Information not available in the document"
+            else:
+                # FAST LLM processing
+                llm_response = await llm_service.generate_answer(question, search_results)
+                answer = llm_response.get('answer', 'Unable to generate answer')
             
-            # Step 3: Generate answer using LLM
-            llm_response = await llm_service.generate_answer(question, search_results)
-            
-            # Extract the answer
-            answer = llm_response.get('answer', 'Unable to generate answer')
-            
-            # Log token usage
-            token_usage = llm_response.get('token_usage', {})
-            logger.info(f"Token usage - Total: {token_usage.get('total_tokens', 0)}")
+            # Cache answer
+            self.answer_cache[cache_key] = answer
             
             return answer
             
         except Exception as e:
-            logger.error(f"Error processing question '{question}': {e}")
-            return f"Error processing question: {str(e)}"
-    
-    async def get_processing_stats(self) -> Dict[str, Any]:
-        """Get processing statistics"""
-        return {
-            'cached_documents': len(self.document_cache),
-            'cache_details': self.document_cache
-        }
+            logger.error(f"FAST question error: {e}")
+            return f"Error: {str(e)}"
 
 # Singleton instance
 query_engine = QueryEngine()
